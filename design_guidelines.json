@@ -1,0 +1,107 @@
+{
+  "theme": "Editorial Organic & Luxury",
+  "typography": {
+    "fonts": {
+      "headings": "Cormorant Garamond, serif",
+      "body": "Outfit, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl+ tracking-tighter leading-none font-medium",
+      "h2": "text-4xl sm:text-5xl tracking-tight leading-tight",
+      "h3": "text-2xl sm:text-3xl tracking-tight",
+      "body": "text-base leading-relaxed",
+      "overline": "uppercase text-xs tracking-[0.2em] font-bold"
+    }
+  },
+  "colors": {
+    "light": {
+      "background": "#FDFBF7",
+      "foreground": "#1A1816",
+      "primary": "#C2410C",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#F3ECE1",
+      "secondary_foreground": "#1A1816",
+      "border": "#E8E1D5",
+      "accent": "#D97706"
+    },
+    "dark": {
+      "background": "#1A1816",
+      "foreground": "#FDFBF7",
+      "primary": "#E35D20",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#2C2825",
+      "secondary_foreground": "#FDFBF7",
+      "border": "#3A3430",
+      "accent": "#F59E0B"
+    }
+  },
+  "visual_enhancers": [
+    "Subtle film grain/noise overlay across the entire page.",
+    "Clipped and arched frames for imagery to give an editorial, art-gallery feel.",
+    "Crystal Glassmorphism (backdrop-blur-xl bg-white/70 or black/60 with 1px delicate inner border) for sticky header and cart bar.",
+    "Generous padding (p-12 to p-32) between major sections for a premium, uncrowded feel.",
+    "Solid, high-contrast borders for brutalist-inspired segments (like the QR code block)."
+  ],
+  "components": {
+    "hero": "Large kinetic text 'Good Food. Good Mood.' with masked line-by-line reveal using Framer Motion. A large clipped rectangular hero image layered dynamically with the text. Subtle parallax effect on scroll.",
+    "marquee": "Slow, organic editorial marquee (react-fast-marquee) showing 'The Cafeteria • Delivery Available • GC CRPF Doyapur • +91 9101328562'. Uses large serif outline typography.",
+    "menu_navigation": "Sticky side navigation for categories on desktop, smooth horizontal scroll list on mobile.",
+    "menu_grid": "Elegant, borderless card list or bento grid. Each food item gets a large spotlight image, bold typography, and a pill-shaped 'Add' button.",
+    "cart_sidebar": "Slide-out or sticky bottom bar on mobile / sidebar on desktop. Displays subtotal only. Clear text stating 'Delivery & Packaging charges to be confirmed manually'.",
+    "qr_menu": "A striking, bold editorial block featuring the QR code for digital access.",
+    "admin_panel": "Clean, dense dashboard using Shadcn UI (Tables, Dialog, Forms) for managing items, prices, and availability. Simple password login."
+  },
+  "layouts": {
+    "main": "Mobile-first. Asymmetrical bento grid for storytelling sections; strict, structured hierarchy for the menu.",
+    "menu": "grid-cols-1 md:grid-cols-12 gap-12 (Categories sticky in col-span-3, Items scrolling in col-span-9)."
+  },
+  "motion": {
+    "scroll": "Lenis for smooth momentum scrolling. It gives the site a heavy, premium feel.",
+    "hero": "Masked line-by-line reveal (Framer Motion).",
+    "sections": "Staggered fade-up and slide-up on scroll.",
+    "micro": "Hover states on menu items (image slight scale/zoom, or button background fill)."
+  },
+  "accessibility": {
+    "contrast": "Ensure APCA contrast ratio. Text on images must have gradient overlay.",
+    "reduced_motion": "Respect prefers-reduced-motion for all Framer Motion elements.",
+    "testing": "All interactive elements MUST include data-testid attribute."
+  },
+  "media": {
+    "image_urls": {
+      "hero_biryani": {
+        "url": "https://images.pexels.com/photos/31537385/pexels-photo-31537385.jpeg",
+        "description": "Hero section large food image (Biryani)"
+      },
+      "dumplings_momos": {
+        "url": "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb",
+        "description": "Menu category or item image for Momos/Dumplings"
+      },
+      "milkshake_drinks": {
+        "url": "https://images.unsplash.com/photo-1653122025865-5e75e63cf4ba",
+        "description": "Menu category or item image for Shakes/Drinks"
+      },
+      "cafe_vendor": {
+        "url": "https://images.pexels.com/photos/33472114/pexels-photo-33472114.jpeg",
+        "description": "Story/Vibe image for 'Our Vibe' or Manifesto section"
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use Framer Motion for the kinetic line-by-line masked text reveal in the hero.",
+    "Implement Lenis for smooth momentum scrolling.",
+    "Build the menu using the provided HTML data as the source of truth.",
+    "Shopping Cart must not auto-calculate delivery. Show subtotal and a static message 'Delivery & Packaging charges to be confirmed manually'.",
+    "Use Shadcn UI for the Admin Panel but heavily customize HTML/Tailwind for the landing page to achieve the Awwwards-level design.",
+    "WhatsApp checkout: On checkout, save the order to the backend DB, then open a wa.me link with a pre-filled message to +91 9101328562."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use generic centered layouts or simplistic gradients.",
+    "Create depth with z-index hierarchy and glassmorphism.",
+    "Never use `transition: all`. Apply specific transitions to avoid breaking transforms.",
+    "Do not use `.App { text-align: center; }`.",
+    "Use pill-shaped or sharp modern buttons with interaction animations.",
+    "No emoji icons. Use Lucide React or similar professional icon library.",
+    "Use sonner for toast notifications.",
+    "Add data-testid attributes to all interactive elements."
+  ]
+}
