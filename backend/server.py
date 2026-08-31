@@ -15,6 +15,7 @@ import base64
 import logging
 import jwt
 from datetime import datetime, timezone, timedelta
+from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -345,6 +346,29 @@ async def rename_category(body: CategoryRenameIn, request: Request):
     await require_admin(request)
     await db.menu_items.update_many({"category": body.old_name}, {"$set": {"category": body.new_name}})
     return {"ok": True}
+
+
+@api_router.post("/admin/items/{item_id}/generate-image")
+async def generate_item_image(item_id: str, request: Request):
+    await require_admin(request)
+    item = await db.menu_items.find_one({"id": item_id})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Image generation key not configured")
+    prompt = (
+        f"Professional food photography of {item['name']}, a {item['category']} dish from an Indian cafeteria. "
+        "Appetizing, freshly prepared, served on a clean plate, warm natural light, shallow depth of field, "
+        "high-end restaurant menu photo, no text, no watermark"
+    )
+    image_gen = OpenAIImageGeneration(api_key=api_key)
+    images = await image_gen.generate_images(prompt=prompt, model="gpt-image-1", number_of_images=1)
+    if not images:
+        raise HTTPException(status_code=500, detail="No image was generated")
+    url = "data:image/png;base64," + base64.b64encode(images[0]).decode()
+    await db.menu_items.update_one({"id": item_id}, {"$set": {"image": url}})
+    return {"ok": True, "image": url}
 
 
 @api_router.post("/admin/upload")

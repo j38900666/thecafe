@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
-  Loader2, LogOut, Plus, Pencil, Trash2, X, RefreshCw, Upload, UtensilsCrossed, ClipboardList, Bell, BellOff,
+  Loader2, LogOut, Plus, Pencil, Trash2, X, RefreshCw, Upload, UtensilsCrossed, ClipboardList, Bell, BellOff, Sparkles,
 } from "lucide-react";
 import { api, authHeaders, formatApiError } from "@/api";
 import { LOGO_URL } from "@/constants";
@@ -232,6 +232,20 @@ function MenuTab() {
     }
   };
 
+  const [genId, setGenId] = useState(null);
+  const generatePhoto = async (item) => {
+    setGenId(item.id);
+    try {
+      const r = await api.post(`/admin/items/${item.id}/generate-image`, {}, { ...authHeaders(), timeout: 120000 });
+      setItems((list) => list.map((x) => (x.id === item.id ? { ...x, image: r.data.image } : x)));
+      toast.success(`AI photo ready for ${item.name}`);
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setGenId(null);
+    }
+  };
+
   const remove = async (item) => {
     if (!window.confirm(`Delete "${item.name}" permanently?`)) return;
     try {
@@ -290,6 +304,11 @@ function MenuTab() {
               <button data-testid={`toggle-available-${item.id.slice(0, 8)}`} onClick={() => toggleAvail(item)}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold ${item.available ? "bg-caf-olive/15 text-caf-olive" : "bg-red-100 text-red-500"}`}>
                 {item.available ? "Available" : "Hidden"}
+              </button>
+              <button data-testid={`generate-photo-${item.id.slice(0, 8)}`} onClick={() => generatePhoto(item)} disabled={genId === item.id}
+                      title="Generate AI photo" aria-label="Generate AI photo"
+                      className="rounded-full border border-caf-line p-2 transition-colors duration-300 hover:border-caf-amber hover:text-caf-amber disabled:opacity-60">
+                {genId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               </button>
               <button data-testid={`edit-item-${item.id.slice(0, 8)}`} onClick={() => { setEditing(item); setDialogOpen(true); }}
                       className="rounded-full border border-caf-line p-2 hover:border-caf-brand hover:text-caf-brand" aria-label="Edit">
