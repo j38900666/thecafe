@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
-  Loader2, LogOut, Plus, Pencil, Trash2, X, RefreshCw, Upload, UtensilsCrossed, ClipboardList,
+  Loader2, LogOut, Plus, Pencil, Trash2, X, RefreshCw, Upload, UtensilsCrossed, ClipboardList, Bell, BellOff,
 } from "lucide-react";
 import { api, authHeaders, formatApiError } from "@/api";
 import { LOGO_URL } from "@/constants";
 
 const STATUSES = ["new", "confirmed", "delivered", "cancelled"];
 
-const emptyForm = { name: "", price: "", category: "", image: "", available: true };
+const emptyForm = { name: "", price: "", category: "", image: "", available: true, veg: true };
 
 function ItemDialog({ open, onClose, onSaved, categories, item }) {
   const [form, setForm] = useState(emptyForm);
@@ -20,7 +20,7 @@ function ItemDialog({ open, onClose, onSaved, categories, item }) {
 
   useEffect(() => {
     if (open) {
-      setForm(item ? { name: item.name, price: item.price, category: item.category, image: item.image, available: item.available } : { ...emptyForm, category: categories[0] || "" });
+      setForm(item ? { name: item.name, price: item.price, category: item.category, image: item.image, available: item.available, veg: item.veg !== false } : { ...emptyForm, category: categories[0] || "" });
       setNewCat("");
     }
   }, [open, item, categories]);
@@ -98,6 +98,14 @@ function ItemDialog({ open, onClose, onSaved, categories, item }) {
                    className="w-full rounded-xl border border-caf-line bg-white px-4 py-3 text-sm outline-none focus:border-caf-brand" />
           </div>
           <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-caf-ink/60">Type</label>
+            <select data-testid="item-veg-select" value={form.veg ? "veg" : "nonveg"} onChange={(e) => setForm({ ...form, veg: e.target.value === "veg" })}
+                    className="w-full rounded-xl border border-caf-line bg-white px-4 py-3 text-sm outline-none focus:border-caf-brand">
+              <option value="veg">Veg</option>
+              <option value="nonveg">Non-Veg</option>
+            </select>
+          </div>
+          <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-caf-ink/60">Photo</label>
             {form.image && <img src={form.image} alt="preview" className="mb-2 h-28 w-full rounded-xl border border-caf-line object-cover" />}
             <input data-testid="item-image-input" value={form.image.startsWith("data:") ? "" : form.image}
@@ -125,7 +133,7 @@ function ItemDialog({ open, onClose, onSaved, categories, item }) {
   );
 }
 
-function OrdersTab() {
+function OrdersTab({ refreshKey }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -141,7 +149,7 @@ function OrdersTab() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshKey]);
 
   const setStatus = async (id, status) => {
     try {
@@ -217,7 +225,7 @@ function MenuTab() {
 
   const toggleAvail = async (item) => {
     try {
-      await api.put(`/admin/items/${item.id}`, { name: item.name, price: item.price, category: item.category, image: item.image, available: !item.available }, authHeaders());
+      await api.put(`/admin/items/${item.id}`, { name: item.name, price: item.price, category: item.category, image: item.image, available: !item.available, veg: item.veg !== false }, authHeaders());
       setItems((list) => list.map((x) => (x.id === item.id ? { ...x, available: !x.available } : x)));
     } catch (e) {
       toast.error(formatApiError(e));
@@ -328,6 +336,93 @@ export default function Admin() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("orders");
+  const [alertsOn, setAlertsOn] = useState(localStorage.getItem("tc_alerts") === "1");
+  const [ordersBump, setOrdersBump] = useState(0);
+  const latestOrderRef = useRef(null);
+
+  const ding = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [784, 1046].forEach((freq, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.type = "sine";
+        o.frequency.value = freq;
+        const t = ctx.currentTime + i * 0.18;
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        o.start(t);
+        o.stop(t + 0.32);
+      });
+    } catch { /* audio blocked */ }
+  };
+
+  const toggleAlerts = async () => {
+    if (alertsOn) {
+      localStorage.setItem("tc_alerts", "0");
+      setAlertsOn(false);
+      toast.success("Order alerts turned off");
+      return;
+    }
+    if (!("Notification" in window)) {
+      toast.error("This browser does not support notifications");
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      localStorage.setItem("tc_alerts", "1");
+      setAlertsOn(true);
+      ding();
+      toast.success("Order alerts on — keep this tab open in the background");
+    } else {
+      toast.error("Notification permission blocked — enable it in browser settings");
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    let stop = false;
+    const poll = async () => {
+      try {
+        const r = await api.get("/admin/orders", authHeaders());
+        if (stop) return;
+        const orders = r.data.orders;
+        const newest = orders[0]?.id || null;
+        if (latestOrderRef.current === null) {
+          latestOrderRef.current = newest;
+          return;
+        }
+        if (newest && newest !== latestOrderRef.current) {
+          const fresh = [];
+          for (const o of orders) {
+            if (o.id === latestOrderRef.current) break;
+            fresh.push(o);
+          }
+          latestOrderRef.current = newest;
+          setOrdersBump((b) => b + 1);
+          const o = fresh[0];
+          if (alertsOn) {
+            ding();
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("New order at The Cafeteria", {
+                body: `${o.name} • ₹${o.subtotal} • ${o.items.length} item(s)`,
+              });
+            }
+          }
+          toast.success(`New order: ${o.name} — ₹${o.subtotal}`, { duration: 10000 });
+        }
+      } catch { /* keep polling */ }
+    };
+    poll();
+    const t = setInterval(poll, 20000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [token, alertsOn]);
 
   const login = async () => {
     setBusy(true);
@@ -386,6 +481,11 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button data-testid="alerts-toggle-btn" onClick={toggleAlerts} title={alertsOn ? "Order alerts on" : "Enable order alerts"}
+                    className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-300 ${alertsOn ? "bg-caf-brand text-white" : "border border-caf-line hover:border-caf-brand"}`}>
+              {alertsOn ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+              <span className="hidden sm:inline">{alertsOn ? "Alerts On" : "Enable Alerts"}</span>
+            </button>
             <button data-testid="tab-orders" onClick={() => setTab("orders")}
                     className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-300 ${tab === "orders" ? "bg-caf-ink text-white" : "border border-caf-line hover:border-caf-brand"}`}>
               <ClipboardList className="h-4 w-4" /> Orders
@@ -402,7 +502,7 @@ export default function Admin() {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {tab === "orders" ? <OrdersTab /> : <MenuTab />}
+        {tab === "orders" ? <OrdersTab refreshKey={ordersBump} /> : <MenuTab />}
       </main>
     </div>
   );

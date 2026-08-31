@@ -287,6 +287,7 @@ class ItemIn(BaseModel):
     category: str
     image: Optional[str] = ""
     available: bool = True
+    veg: bool = True
 
 
 @api_router.get("/admin/items")
@@ -373,11 +374,26 @@ app.add_middleware(
 )
 
 
+NON_VEG_WORDS = ("chicken", "egg", "mutton", "fish", "prawn", "omelette")
+
+
+def classify_veg(name: str) -> bool:
+    n = name.lower()
+    return not any(w in n for w in NON_VEG_WORDS)
+
+
+async def migrate_veg():
+    cursor = db.menu_items.find({"veg": {"$exists": False}}, {"id": 1, "name": 1})
+    async for it in cursor:
+        await db.menu_items.update_one({"id": it["id"]}, {"$set": {"veg": classify_veg(it["name"])}})
+
+
 @app.on_event("startup")
 async def startup():
     await db.menu_items.create_index("id", unique=True)
     await db.login_attempts.create_index("identifier")
     await seed_menu()
+    await migrate_veg()
 
 
 @app.on_event("shutdown")
