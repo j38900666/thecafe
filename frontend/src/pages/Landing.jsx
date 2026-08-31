@@ -3,6 +3,7 @@ import Lenis from "lenis";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Marquee from "@/components/Marquee";
+import SpecialsSection from "@/components/SpecialsSection";
 import Manifesto from "@/components/Manifesto";
 import MenuSection from "@/components/MenuSection";
 import DeliveryBanner from "@/components/DeliveryBanner";
@@ -35,6 +36,7 @@ export default function Landing() {
       <main id="top">
         <Hero />
         <Marquee />
+        <SpecialsSection />
         <Manifesto />
         <MenuSection />
         <DeliveryBanner />

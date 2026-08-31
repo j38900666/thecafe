@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { QrCode, Smartphone } from "lucide-react";
+import { Link } from "react-router-dom";
+import { QrCode, Smartphone, Printer } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 
 export default function QRSection() {
@@ -22,6 +23,12 @@ export default function QRSection() {
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-caf-ink/15 bg-white px-5 py-2.5 text-sm text-caf-ink/70">
             <Smartphone className="h-4 w-4 text-caf-brand" />
             <span className="max-w-[240px] truncate" data-testid="qr-site-url">{siteUrl}</span>
+          </div>
+          <div className="mt-4">
+            <Link to="/poster" data-testid="qr-poster-btn"
+                  className="inline-flex items-center gap-2 rounded-full bg-caf-ink px-6 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:bg-caf-brand">
+              <Printer className="h-4 w-4" /> Print Table Poster
+            </Link>
           </div>
         </motion.div>
 

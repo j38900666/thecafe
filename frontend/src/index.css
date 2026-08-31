@@ -115,3 +115,23 @@
         animation: none;
     }
 }
+
+/* Print styles for the QR poster */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    body {
+        background: #ffffff !important;
+    }
+    .grain::after {
+        display: none !important;
+    }
+    .poster-card {
+        box-shadow: none !important;
+        margin: 0 auto;
+    }
+    @page {
+        margin: 12mm;
+    }
+}

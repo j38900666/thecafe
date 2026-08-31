@@ -289,6 +289,7 @@ class ItemIn(BaseModel):
     image: Optional[str] = ""
     available: bool = True
     veg: bool = True
+    special: bool = False
 
 
 @api_router.get("/admin/items")
@@ -418,6 +419,7 @@ async def startup():
     await db.login_attempts.create_index("identifier")
     await seed_menu()
     await migrate_veg()
+    await db.menu_items.update_many({"special": {"$exists": False}}, {"$set": {"special": False}})
 
 
 @app.on_event("shutdown")

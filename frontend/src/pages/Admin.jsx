@@ -3,14 +3,14 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
-  Loader2, LogOut, Plus, Pencil, Trash2, X, RefreshCw, Upload, UtensilsCrossed, ClipboardList, Bell, BellOff, Sparkles,
+  Loader2, LogOut, Plus, Pencil, Trash2, X, RefreshCw, Upload, UtensilsCrossed, ClipboardList, Bell, BellOff, Sparkles, Star,
 } from "lucide-react";
 import { api, authHeaders, formatApiError } from "@/api";
 import { LOGO_URL } from "@/constants";
 
 const STATUSES = ["new", "confirmed", "delivered", "cancelled"];
 
-const emptyForm = { name: "", price: "", category: "", image: "", available: true, veg: true };
+const emptyForm = { name: "", price: "", category: "", image: "", available: true, veg: true, special: false };
 
 function ItemDialog({ open, onClose, onSaved, categories, item }) {
   const [form, setForm] = useState(emptyForm);
@@ -20,7 +20,7 @@ function ItemDialog({ open, onClose, onSaved, categories, item }) {
 
   useEffect(() => {
     if (open) {
-      setForm(item ? { name: item.name, price: item.price, category: item.category, image: item.image, available: item.available, veg: item.veg !== false } : { ...emptyForm, category: categories[0] || "" });
+      setForm(item ? { name: item.name, price: item.price, category: item.category, image: item.image, available: item.available, veg: item.veg !== false, special: item.special === true } : { ...emptyForm, category: categories[0] || "" });
       setNewCat("");
     }
   }, [open, item, categories]);
@@ -122,6 +122,11 @@ function ItemDialog({ open, onClose, onSaved, categories, item }) {
             <input type="checkbox" checked={form.available} onChange={(e) => setForm({ ...form, available: e.target.checked })}
                    className="h-4 w-4 accent-caf-brand" />
             Available on the menu
+          </label>
+          <label className="flex items-center gap-3 text-sm" data-testid="item-special-toggle">
+            <input type="checkbox" checked={!!form.special} onChange={(e) => setForm({ ...form, special: e.target.checked })}
+                   className="h-4 w-4 accent-caf-amber" />
+            Today&apos;s Special (featured at the top of the site)
           </label>
           <button data-testid="item-save-btn" onClick={save} disabled={saving}
                   className="flex w-full items-center justify-center gap-2 rounded-full bg-caf-brand py-3.5 text-sm font-semibold text-white hover:bg-caf-ink disabled:opacity-60">
@@ -225,8 +230,19 @@ function MenuTab() {
 
   const toggleAvail = async (item) => {
     try {
-      await api.put(`/admin/items/${item.id}`, { name: item.name, price: item.price, category: item.category, image: item.image, available: !item.available, veg: item.veg !== false }, authHeaders());
+      await api.put(`/admin/items/${item.id}`, { name: item.name, price: item.price, category: item.category, image: item.image, available: !item.available, veg: item.veg !== false, special: item.special === true }, authHeaders());
       setItems((list) => list.map((x) => (x.id === item.id ? { ...x, available: !x.available } : x)));
+    } catch (e) {
+      toast.error(formatApiError(e));
+    }
+  };
+
+  const toggleSpecial = async (item) => {
+    try {
+      const next = !(item.special === true);
+      await api.put(`/admin/items/${item.id}`, { name: item.name, price: item.price, category: item.category, image: item.image, available: item.available, veg: item.veg !== false, special: next }, authHeaders());
+      setItems((list) => list.map((x) => (x.id === item.id ? { ...x, special: next } : x)));
+      toast.success(next ? `${item.name} is today's special` : `${item.name} removed from specials`);
     } catch (e) {
       toast.error(formatApiError(e));
     }
@@ -304,6 +320,11 @@ function MenuTab() {
               <button data-testid={`toggle-available-${item.id.slice(0, 8)}`} onClick={() => toggleAvail(item)}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold ${item.available ? "bg-caf-olive/15 text-caf-olive" : "bg-red-100 text-red-500"}`}>
                 {item.available ? "Available" : "Hidden"}
+              </button>
+              <button data-testid={`toggle-special-${item.id.slice(0, 8)}`} onClick={() => toggleSpecial(item)}
+                      title={item.special ? "Remove from Today's Specials" : "Mark as Today's Special"} aria-label="Toggle special"
+                      className={`rounded-full border p-2 transition-colors duration-300 ${item.special ? "border-caf-amber text-caf-amber" : "border-caf-line hover:border-caf-amber hover:text-caf-amber"}`}>
+                <Star className="h-3.5 w-3.5" fill={item.special ? "currentColor" : "none"} />
               </button>
               <button data-testid={`generate-photo-${item.id.slice(0, 8)}`} onClick={() => generatePhoto(item)} disabled={genId === item.id}
                       title="Generate AI photo" aria-label="Generate AI photo"

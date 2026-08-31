@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Loader2, Search } from "lucide-react";
+import { Plus, Loader2, Search, Star } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/api";
 import { useCart } from "@/context/CartContext";
@@ -16,6 +16,12 @@ const ItemCard = ({ item }) => {
         <img src={item.image} alt={item.name} loading="lazy"
              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = itemFallback(item.category); }}
              className="aspect-[4/3] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" />
+        {item.special && (
+          <span data-testid={`special-badge-${slug(item.name)}`}
+                className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-caf-amber px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-caf-ink">
+            <Star className="h-3 w-3" fill="currentColor" /> Today&apos;s Special
+          </span>
+        )}
         <button data-testid={`add-to-cart-${slug(item.name)}`}
                 onClick={() => { add(item); toast.success(`${item.name} added to cart`); }}
                 className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-caf-ink/90 px-4 py-2 text-xs font-semibold text-white backdrop-blur transition-colors duration-300 hover:bg-caf-brand">
