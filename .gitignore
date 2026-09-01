@@ -31,6 +31,13 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
+.env
+*.env
+!.env.example
+.env.local
+.env.*.local
+.emergent/
+.ruff_cache/
 
 *token.json*
 *credentials.json*
@@ -79,4 +86,4 @@ agenthub/agents/youtube/db
 memory/test_credentials.md
 
 # Mobile development
-android-sdk/
+android-sdk/memory/PRD.md
