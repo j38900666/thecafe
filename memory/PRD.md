@@ -49,6 +49,9 @@ Build a premium, modern, mobile-first, fully responsive website for **The Cafete
 ## Implemented (2026-09-01, iteration 6)
 - GitHub-ready hardening: .env files gitignored (never tracked), backend/.env.example + frontend/.env.example with placeholders, full project README.md (features, stack, structure, setup, deployment), git history scrubbed of secrets (commit messages + PRD history rewritten; PRD.md now gitignored, exists on disk only)
 
+## Implemented (2026-09-01, iteration 7)
+- Deployment prep: frontend/vercel.json (CRA build + SPA rewrites), render.yaml blueprint (backend web service with env var placeholders, auto JWT secret), DEPLOYMENT.md step-by-step guide (GitHub push → MongoDB Atlas → Render backend → Vercel frontend → custom domain), production build verified passing (yarn build, ~31s)
+
 ## Backlog
 - P1: Real dish photography uploaded by owner via admin panel (replace stock)
 - P1: Push to GitHub via Emergent "Save to GitHub" + deploy frontend to Vercel
