@@ -1,0 +1,49 @@
+{
+  "summary": "Full e2e test of The Cafeteria (backend + frontend). Backend: 26 pytest cases against public URL — all pass (menu 22 seeded items, category/search/include_unavailable filters, 8 categories, settings, reviews, order create with CAF#### + pending status, mobile lookup, admin menu CRUD, image upload data-URL, admin order list + status update, settings PUT, review delete, and 401/403 enforcement on all 8 admin endpoints). Frontend: homepage (hero, 4 CTAs, delivery banner, Today's Special, Best Sellers, Party, Reviews, Contact+QR), menu page (22 cards render, search + category pills filter, add-to-cart & qty stepper), cart sheet (inc/dec/remove, subtotal, checkout nav), checkout (validation, COD place order -> /orders with CAF1001, WhatsApp order -> order persisted + wa.me tab opened), My Orders (find by mobile, invalid-mobile validation, Reorder repopulates cart), Admin (Google login gate, cookie-injected session -> dashboard, add/edit/delete item, order status persisted, reviews list, settings save persisted, logout). Mobile (390px) and tablet (768px) checked - no horizontal overflow, hamburger nav works. Found and fixed 1 CRITICAL frontend crash bug (useEffect returning a Promise).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders", "issue": "order_number is generated from db.orders.count_documents({}) + 1001, so numbers repeat after any order deletion and can collide under concurrent creates (reproduced: CAF1001 was reissued after test orders were purged). Use a counters collection / findOneAndUpdate $inc for a monotonic sequence."},
+      {"endpoint": "GET /api/orders?admin=true", "issue": "Uses `request: Request = None` and calls require_admin manually instead of a dependency; auth works but a missing Request would raise AttributeError. Prefer splitting into /api/orders/admin with Depends(require_admin)."},
+      {"endpoint": "startup", "issue": "@app.on_event(\"startup\") is deprecated in current FastAPI; migrate to lifespan handler."},
+      {"endpoint": "PUT /api/orders/{id}/status", "issue": "Accepts raw dict and any arbitrary status string (no Pydantic model / enum validation against STATUSES)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin.js (MenuManager/OrdersManager/ReviewsManager)", "issue": "FIXED BY TESTER: `useEffect(load, [])` where `load` returns a Promise made React treat the promise as a cleanup fn -> 'TypeError: destroy is not a function' uncaught runtime error overlay; admin dashboard crashed when switching tabs (Reviews rendered 0 items, Settings tab became unreachable). Changed to `useEffect(() => { load(); }, [])` in 3 places; re-tested all 4 tabs with repeated switching - zero console errors.", "selector": "[data-testid=\"admin-tab-reviews\"]", "priority": "CRITICAL (fixed)"},
+      {"component": "Admin menu item card", "issue": "Items saved without an image show the browser broken-image icon + alt text instead of a placeholder (reproduced by adding an item with empty image_url).", "selector": "[data-testid^=\"admin-item-\"] img", "priority": "LOW"},
+      {"component": "Toaster", "issue": "Toast is centered over the navbar and covers the 'QR / Contact' nav link while visible.", "selector": "nav", "priority": "LOW"},
+      {"component": "Router", "issue": "Unknown routes (e.g. /some-unknown-route) silently render the Home page; no 404 page.", "selector": "-", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Every page load", "issue": "GET /api/auth/me fires unauthenticated on public pages and logs a 401 to the console on every page. Functionally harmless but noisy; skip the call or swallow the 401 in AuthProvider.", "affected_selectors": ["-"]}
+    ],
+    "design_issues": [
+      {"screen": "Admin > Reviews", "issues": ["Review delete button had no data-testid — added data-testid=\"delete-review-<id>\" (tester fix)"]},
+      {"screen": "Admin.js line 329", "issues": ["ESLint react/no-unescaped-entities errors for raw double quotes in review comment JSX"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Make order_number monotonic (counters collection with $inc) so numbers never repeat/collide",
+    "Validate order status with an Enum/Pydantic model in PUT /api/orders/{id}/status",
+    "Show a placeholder image for menu items without image_url (admin list + public cards)",
+    "Reposition toast so it does not overlay navbar links; add a 404 route; avoid the unauthenticated /api/auth/me 401 console noise",
+    "Refactor GET /api/orders admin branch to use Depends(require_admin) and migrate startup seed to FastAPI lifespan",
+    "Fix ESLint react/no-unescaped-entities in Admin.js:329"
+  ],
+  "critical_code_review_comments": [
+    "Never pass a promise-returning function directly to useEffect — it silently becomes the cleanup fn and crashes on unmount (this was the admin dashboard crash).",
+    "order_number derived from a collection count is not a safe sequence generator (duplicates after deletes, race under concurrency).",
+    "Admin.js is 376 lines with 5 managers in one file; consider splitting per tab for maintainability."
+  ],
+  "updated_files": ["/app/frontend/src/pages/Admin.js", "/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (26/26 pytest)", "frontend": "~95% (all core flows pass after the useEffect fix; remaining items are cosmetic)"},
+  "seed_data_creation": "Admin test session injected in Mongo (cafeteria_db.users/user_sessions, token test_session_1788345010937, is_admin=true) — still present for reuse. Test orders (mobiles 9000000001/2/3), TEST_ menu items and TEST reviews created during testing were deleted; DB restored to 22 menu items, 3 reviews, 0 orders, default settings (delivery 30 / packaging 15 / free above 500).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "No passwords. Admin = Emergent Google OAuth; for testing inject Mongo session per /app/memory/test_credentials.md. Reusable token: test_session_1788345010937 (Bearer header or httpOnly cookie session_token).",
+  "context_for_next_testing_agent": "Run `pytest /app/backend/tests/backend_test.py` — it self-provisions an admin session via pymongo and cleans up. Frontend flows verified: home, /menu, cart sheet, /checkout (COD + WhatsApp), /orders, /admin all tabs. The only fix applied was the useEffect promise-cleanup crash in Admin.js. Remaining open items are cosmetic + order_number sequencing.",
+  "rca_of_the_issue": "Admin dashboard crash RCA: MenuManager/OrdersManager/ReviewsManager used `useEffect(load, [])` where `load = () => api.get(...).then(...)` returns a Promise. React 18 stores the return value as the cleanup function; on unmount (tab switch) it calls destroy() -> 'TypeError: destroy is not a function', which propagated as an uncaught render error and replaced the dashboard with the CRA error overlay. Fixed by wrapping: `useEffect(() => { load(); }, [])`. Verified by switching all 4 admin tabs 7 times with zero console errors and full CRUD/settings persistence."
+}

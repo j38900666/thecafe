@@ -1,0 +1,93 @@
+{
+  "theme": "dark",
+  "archetype": "Archetype 5: Luxury (Premium, Depth, Mystery)",
+  "typography": {
+    "headings": "Playfair Display",
+    "body": "Manrope",
+    "rules": [
+      "Use tracking-tight for H1/H2",
+      "Overlines must be uppercase, tracking-[0.2em], text-xs",
+      "Never use Inter for headings."
+    ]
+  },
+  "colors": {
+    "primary": "#F59E0B",
+    "primary_hover": "#D97706",
+    "background": "#0A0A0A",
+    "surface": "#171717",
+    "surface_elevated": "#262626",
+    "text_main": "#F5F5F5",
+    "text_muted": "#A3A3A3",
+    "border": "#333333"
+  },
+  "visual_enhancers": {
+    "shadows": "Subtle ambient glows for active elements, dark deep shadows for elevated cards.",
+    "borders": "1px solid #333333 (border-white/10 in Tailwind) to separate dark surfaces.",
+    "glassmorphism": "backdrop-blur-xl bg-black/60 border-b border-white/10 for sticky headers and bottom cart sheets. NEVER fully transparent."
+  },
+  "layouts": {
+    "homepage": "Hero full height (min-h-[80vh]) with dark overlay. Sections below use wide spacing (py-24). Bento grid for Best Sellers / Today's Special.",
+    "menu_section": "Horizontal scroll (mobile) or grid-cols-4 (desktop) for menu categories. Menu items in a dense grid (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3) with large tap targets.",
+    "admin_dashboard": "Sidebar layout. High density table (grid-cols-1 md:grid-cols-4) for menu items. Sharp edges, minimal padding for data density."
+  },
+  "motion": {
+    "hover": "Smooth scale up (scale-105) for food images on hover. Buttons translate-y-[-2px] with glow.",
+    "transitions": "Use specific properties: transition: transform 0.3s ease, opacity 0.3s ease. NO transition-all.",
+    "page": "Staggered fade-up for menu items."
+  },
+  "components": {
+    "menu_card": "Flat surface (bg-neutral-900), rounded-2xl, overflow-hidden. Image at top (h-48 object-cover). Content p-4. Plus/Minus quantity selector integrated.",
+    "category_pills": "Pill shaped (rounded-full), bg-neutral-800 text-neutral-300, active state: bg-amber-500 text-black font-semibold.",
+    "cart_sheet": "Fixed bottom-0 w-full rounded-t-3xl glassmorphism. Slide up animation.",
+    "admin_table": "Shadcn Table component, customized with dark rows, hover:bg-neutral-800."
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1709548145082-04d0cde481d4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHwzfHxwcmVtaXVtJTIwZGFyayUyMHJlc3RhdXJhbnQlMjBpbnRlcmlvciUyMG1vb2R5fGVufDB8fHx8MTc4NzExNzE5NHww&ixlib=rb-4.1.0&q=85",
+      "description": "Dimly lit elegant restaurant interior for homepage hero."
+    },
+    "category_noodles": {
+      "url": "https://images.unsplash.com/photo-1756907507167-4ea741e24e2a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwyfHxub29kbGUlMjBkaXNoJTIwcHJlbWl1bSUyMHBsYXRpbmd8ZW58MHx8fHwxNzg4MzQzMDk0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Premium noodles in brass bowl."
+    },
+    "category_rice": {
+      "url": "https://images.unsplash.com/photo-1603133872878-684f208fb84b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHxnb3VybWV0JTIwZnJpZWQlMjByaWNlJTIwcGxhdGluZ3xlbnwwfHx8fDE3ODc1NDk0Njh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Premium fried rice plating."
+    },
+    "category_drinks": {
+      "url": "https://images.unsplash.com/photo-1767065703415-ff8eef35e168?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHw0fHxyZWZyZXNoaW5nJTIwbW9ja3RhaWwlMjBjb2NrdGFpbCUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4ODM0MzA5NHww&ixlib=rb-4.1.0&q=85",
+      "description": "Refreshing mocktails/cocktails."
+    },
+    "general_food": {
+      "url": "https://images.unsplash.com/photo-1690983322857-0811d47fedfc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxwcmVtaXVtJTIwcmVzdGF1cmFudCUyMGZvb2QlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODgzNDMwOTR8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Table topped with premium food dishes."
+    }
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Create depth through layered design elements with z-index hierarchy and glass-morphism effects.",
+    "You MUST NOT apply universal transition (e.g., transition: all). Add specific transitions.",
+    "You MUST NOT center align the app container (.App { text-align: center; }).",
+    "Always use modern button styles (pill-shaped or sharp) with interaction animations.",
+    "NEVER use AI assistant Emoji characters (🤖🧠💭💡) for icons.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Use 'sonner' for toasts.",
+    "Prioritize using pre-existing components from src/components/ui.",
+    "Ensure the .js (.jsx) extension approach is strictly followed instead of .tsx."
+  ],
+  "instructions_to_main_agent": [
+    "Prioritize a mobile-first, app-like experience for the ordering flow (critical for restaurant platforms).",
+    "Use Shadcn UI for complex interactions, but completely strip the default Vercel-look to match the dark luxury theme.",
+    "No online payments backend logic. Checkout form just collects user details and outputs a WhatsApp-formatted string (window.open with wa.me link).",
+    "Admin uses Google Login (use simple mock or standard OAuth integration).",
+    "Ensure all food cards have a visible veg/non-veg indicator (green/red dot).",
+    "Add prominent party booking section visually distinct from the standard menu.",
+    "Implement search and category filter smoothly without page reloads."
+  ],
+  "accessibility": [
+    "All interactive elements MUST include a data-testid attribute.",
+    "Ensure text contrast over images (use bg-black/50 or gradient overlays).",
+    "Never use completely transparent backgrounds for headers or overlays. ALWAYS use backdrop blur with a tint."
+  ]
+}
