@@ -7,7 +7,7 @@ from typing import List, Optional, Annotated
 import requests
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BaseModel, Field, BeforeValidator, field_validator
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pathlib import Path
@@ -81,6 +81,49 @@ class SettingsIn(BaseModel):
     free_delivery_above: float
     offer_banner: str
     party_note: str
+
+
+class OfferIn(BaseModel):
+    text: str
+    active: bool = True
+
+
+BOOKING_TYPES = ["Table Reservation", "Birthday Party", "Anniversary Party", "Kitty Party", "Get Together"]
+BOOKING_STATUSES = ["pending", "confirmed", "cancelled"]
+
+
+import re as _re
+from datetime import date as _date
+
+
+class BookingIn(BaseModel):
+    name: str
+    mobile: str
+    booking_type: str = "Table Reservation"
+    date: str = ""
+    time: str = ""
+    guests: int = 2
+    notes: str = ""
+
+    @field_validator("mobile")
+    @classmethod
+    def _validate_mobile(cls, v):
+        if not _re.fullmatch(r"\d{10}", (v or "").strip()):
+            raise ValueError("mobile must be a 10-digit number")
+        return v.strip()
+
+    @field_validator("date")
+    @classmethod
+    def _validate_date(cls, v):
+        if not v:
+            raise ValueError("date is required")
+        try:
+            d = _date.fromisoformat(v)
+        except ValueError:
+            raise ValueError("date must be YYYY-MM-DD")
+        if d < _date.today():
+            raise ValueError("date cannot be in the past")
+        return v
 
 
 # ---------------- Auth helpers ----------------
@@ -307,6 +350,84 @@ async def delete_review(review_id: str, user=Depends(require_admin)):
     return {"ok": True}
 
 
+# ---------------- Offers (rotating banner) ----------------
+@api.get("/offers")
+async def get_offers():
+    return await db.offers.find({"active": True}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@api.get("/offers/admin")
+async def get_offers_admin(user=Depends(require_admin)):
+    return await db.offers.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@api.post("/offers")
+async def create_offer(offer: OfferIn, user=Depends(require_admin)):
+    doc = offer.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = now_utc().isoformat()
+    await db.offers.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/offers/{offer_id}")
+async def update_offer(offer_id: str, offer: OfferIn, user=Depends(require_admin)):
+    res = await db.offers.update_one({"id": offer_id}, {"$set": offer.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    return await db.offers.find_one({"id": offer_id}, {"_id": 0})
+
+
+@api.delete("/offers/{offer_id}")
+async def delete_offer(offer_id: str, user=Depends(require_admin)):
+    await db.offers.delete_one({"id": offer_id})
+    return {"ok": True}
+
+
+# ---------------- Bookings (table & party) ----------------
+@api.post("/bookings")
+async def create_booking(booking: BookingIn):
+    if booking.booking_type not in BOOKING_TYPES:
+        raise HTTPException(status_code=422, detail="Invalid booking type")
+    doc = booking.model_dump()
+    doc["id"] = str(uuid.uuid4())
+    counter = await db.counters.find_one_and_update(
+        {"_id": "booking_number"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
+    )
+    doc["booking_number"] = f"BK{100 + counter['seq']}"
+    doc["status"] = "pending"
+    doc["created_at"] = now_utc().isoformat()
+    await db.bookings.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/bookings")
+async def list_bookings(request: Request):
+    await require_admin(request)
+    return await db.bookings.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+
+@api.put("/bookings/{booking_id}/status")
+async def update_booking_status(booking_id: str, payload: dict, user=Depends(require_admin)):
+    status = payload.get("status")
+    if status not in BOOKING_STATUSES:
+        raise HTTPException(status_code=422, detail="Invalid status")
+    res = await db.bookings.update_one({"id": booking_id}, {"$set": {"status": status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return {"ok": True}
+
+
+@api.delete("/bookings/{booking_id}")
+async def delete_booking(booking_id: str, user=Depends(require_admin)):
+    res = await db.bookings.delete_one({"id": booking_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return {"ok": True}
+
+
 # ---------------- Settings ----------------
 @api.get("/settings")
 async def get_settings():
@@ -375,6 +496,12 @@ SEED_REVIEWS = [
     {"name": "Amit Roy", "rating": 4, "comment": "Great party arrangement for my son's birthday. Highly recommend."},
 ]
 
+SEED_OFFERS = [
+    {"text": "Flat 10% OFF on your first online order — use code WELCOME10", "active": True},
+    {"text": "Free home delivery on all orders above ₹500", "active": True},
+    {"text": "Advance booking open for Birthday, Anniversary, Kitty & Get-Together parties!", "active": True},
+]
+
 
 @app.on_event("startup")
 async def seed():
@@ -394,6 +521,11 @@ async def seed():
         await db.reviews.insert_many(SEED_REVIEWS)
     if not await db.settings.find_one({"_id": "config"}):
         await db.settings.update_one({"_id": "config"}, {"$set": DEFAULT_SETTINGS}, upsert=True)
+    if await db.offers.count_documents({}) == 0:
+        for o in SEED_OFFERS:
+            o["id"] = str(uuid.uuid4())
+            o["created_at"] = now_utc().isoformat()
+        await db.offers.insert_many(SEED_OFFERS)
 
 
 @api.get("/health")

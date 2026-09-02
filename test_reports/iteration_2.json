@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 2 testing of new OFFERS banner + table/party BOOKING features plus regression. Backend: 46 pytest tests (added TestOffers 8 + TestBookings 12) — 46/46 passing after fixing one stale test from iteration_1. Frontend: verified rotating offer banner (3 seeded offers, auto-rotate every 4s, dots switch slides), navbar 'Book Table' scroll, booking form validation (name/mobile/date), COD-style booking submit (BK119) and WhatsApp booking submit (BK120, wa.me tab opened), admin Bookings tab status update (pending->confirmed persisted), admin Offers tab add/toggle/delete with live reflection on homepage banner, and regression of menu/cart/checkout(COD pickup, order CAF1005)/My Orders lookup+reorder and all admin tabs. Mobile (390x844) banner + booking section verified. Zero console errors. All test data cleaned up — DB back to baseline (3 offers, 0 bookings).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/bookings", "issue": "No server-side validation of mobile (any string accepted, e.g. '12345') or date (empty string accepted, past dates accepted). Validation exists only in the React form, so direct API calls create junk bookings."},
+      {"endpoint": "GET /api/offers", "issue": "Signature `async def get_offers(all: bool = False, request: Request = None)` uses builtin name `all` and an Optional Request; require_admin(request) would raise AttributeError if request were ever None. Works today but fragile — prefer a separate /api/offers/admin route or Depends."},
+      {"endpoint": "/api/bookings", "issue": "No DELETE endpoint — admin can only change status; stale/spam bookings can never be removed from the dashboard."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Homepage booking form (BookingSection)", "issues": ["booking-date and booking-time use raw native HTML inputs (type=date/time) showing browser default mm/dd/yyyy picker instead of the shadcn Calendar component used elsewhere — inconsistent look and US date format for an India-focused site", "No min attribute on the date input, so a guest can request a booking for a date in the past"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Add Pydantic/field validation on POST /api/bookings for mobile (10 digits) and date (required, not in the past)",
+    "Optional: replace native date/time inputs in BookingSection with shadcn Calendar/time select and set min=today",
+    "Optional: add DELETE /api/bookings/{id} for admin cleanup"
+  ],
+  "critical_code_review_comments": [
+    "server.py get_offers mixes public and admin behaviour behind an `all` query flag with an Optional Request; split into two routes for clarity and safety",
+    "Booking validation is client-side only — mirror the 10-digit mobile / required date rules in BookingIn"
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created and then deleted: bookings BK119/BK120 (mobile 9000000002), offer 'QA_TEST_OFFER rotating check', order CAF1005, plus TEST_ pytest fixtures. DB verified back to 3 offers / 0 bookings. Note: the booking_number counter now sits at 20, so the next real booking will be BK121 (expected behaviour of $inc counter).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "Admin session token test_session_1788345010937 (Mongo user_sessions, is_admin=true) still valid; usable as Bearer header or httpOnly cookie session_token.",
+  "context_for_next_testing_agent": "Offers + Bookings backend/frontend fully covered in /app/backend/tests/backend_test.py (TestOffers, TestBookings). One iteration_1 test was stale (used order status 'delivered'; valid statuses are pending/confirmed/preparing/out_for_delivery/completed/cancelled) — fixed to 'completed'. Remaining open items are validation hardening only; no functional bugs found.",
+  "rca_of_the_issue": "Only failure encountered was TestAdminFlows::test_admin_orders_and_status_update returning 422 — root cause: ORDER_STATUSES in server.py no longer contains 'delivered' (renamed to out_for_delivery/completed, matching Admin.js STATUSES), while the iteration_1 test still asserted 'delivered'. Test updated; not an application defect."
+}

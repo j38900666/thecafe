@@ -13,6 +13,7 @@ export default function Navbar() {
   const links = [
     { label: "Home", to: "/" },
     { label: "Menu", to: "/menu" },
+    { label: "Book Table", to: "/#booking" },
     { label: "My Orders", to: "/orders" },
     { label: "QR / Contact", to: "/#contact" },
   ];

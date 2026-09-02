@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, Plus, Pencil, Trash2, Package, UtensilsCrossed, Star, Settings as SettingsIcon, X, Upload, Loader2 } from "lucide-react";
+import { LogOut, Plus, Pencil, Trash2, Package, UtensilsCrossed, Star, Settings as SettingsIcon, X, Upload, Loader2, Tag, CalendarCheck } from "lucide-react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { BUSINESS, CURRENCY, PLACEHOLDER_IMG } from "../lib/constants";
@@ -55,6 +55,8 @@ function Dashboard({ user, logout }) {
   const tabs = [
     { id: "menu", label: "Menu", icon: UtensilsCrossed },
     { id: "orders", label: "Orders", icon: Package },
+    { id: "bookings", label: "Bookings", icon: CalendarCheck },
+    { id: "offers", label: "Offers", icon: Tag },
     { id: "reviews", label: "Reviews", icon: Star },
     { id: "settings", label: "Settings", icon: SettingsIcon },
   ];
@@ -86,6 +88,8 @@ function Dashboard({ user, logout }) {
 
       {tab === "menu" && <MenuManager />}
       {tab === "orders" && <OrdersManager />}
+      {tab === "bookings" && <BookingsManager />}
+      {tab === "offers" && <OffersManager />}
       {tab === "reviews" && <ReviewsManager />}
       {tab === "settings" && <SettingsManager />}
     </div>
@@ -302,6 +306,87 @@ function OrdersManager() {
               {o.items.map((i, idx) => <span key={idx} className="text-white/80">{i.name} ×{i.qty}</span>)}
             </div>
             {o.delivery_instructions && <div className="text-xs text-muted mt-2">Note: {o.delivery_instructions}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Offers Manager ----------------
+function OffersManager() {
+  const [offers, setOffers] = useState([]);
+  const [text, setText] = useState("");
+  const load = () => api.get("/offers/admin").then((r) => setOffers(r.data)).catch(() => toast.error("Failed to load"));
+  useEffect(() => { load(); }, []);
+
+  const add = async () => {
+    if (!text.trim()) { toast.error("Enter offer text"); return; }
+    await api.post("/offers", { text: text.trim(), active: true });
+    setText("");
+    toast.success("Offer added");
+    load();
+  };
+  const toggle = async (o) => { await api.put(`/offers/${o.id}`, { text: o.text, active: !o.active }); load(); };
+  const del = async (id) => { await api.delete(`/offers/${id}`); toast.success("Offer deleted"); load(); };
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="font-display text-2xl mb-2">Rotating Offers</h2>
+      <p className="text-muted text-sm mb-5">Active offers rotate automatically in the homepage banner.</p>
+      <div className="flex gap-3 mb-6">
+        <input data-testid="offer-input" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} placeholder="e.g. 20% OFF this Diwali weekend!" className="flex-1 bg-surface border border-white/10 rounded-full px-5 py-3 outline-none focus:border-primary transition-colors" />
+        <button data-testid="offer-add-btn" onClick={add} className="bg-primary text-black font-bold px-6 rounded-full flex items-center gap-2 hover:bg-primaryHover transition-colors"><Plus size={18} /> Add</button>
+      </div>
+      <div className="space-y-3">
+        {offers.length === 0 && <div className="text-muted py-6 text-center">No offers yet.</div>}
+        {offers.map((o) => (
+          <div key={o.id} data-testid={`admin-offer-${o.id}`} className="bg-surface border border-white/10 rounded-xl p-4 flex items-center gap-3">
+            <Tag size={18} className={o.active ? "text-primary" : "text-white/30"} />
+            <span className={`flex-1 ${o.active ? "" : "text-muted line-through"}`}>{o.text}</span>
+            <button data-testid={`offer-toggle-${o.id}`} onClick={() => toggle(o)} className={`text-xs font-bold px-3 py-1.5 rounded-full ${o.active ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/50"}`}>{o.active ? "Active" : "Hidden"}</button>
+            <button data-testid={`offer-delete-${o.id}`} onClick={() => del(o.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Bookings Manager ----------------
+const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"];
+const BK_COLORS = { pending: "bg-yellow-500/20 text-yellow-400", confirmed: "bg-green-500/20 text-green-400", cancelled: "bg-red-500/20 text-red-400" };
+
+function BookingsManager() {
+  const [bookings, setBookings] = useState([]);
+  const load = () => api.get("/bookings").then((r) => setBookings(r.data)).catch(() => toast.error("Failed to load"));
+  useEffect(() => { load(); }, []);
+  const setStatus = async (id, status) => { await api.put(`/bookings/${id}/status`, { status }); toast.success("Booking updated"); load(); };
+  const del = async (id) => { if (!window.confirm("Delete this booking?")) return; await api.delete(`/bookings/${id}`); toast.success("Booking deleted"); load(); };
+
+  return (
+    <div>
+      <h2 className="font-display text-2xl mb-5">Booking Requests ({bookings.length})</h2>
+      <div className="space-y-4">
+        {bookings.length === 0 && <div className="text-muted py-10 text-center">No booking requests yet.</div>}
+        {bookings.map((b) => (
+          <div key={b.id} data-testid={`admin-booking-${b.booking_number}`} className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="flex justify-between flex-wrap gap-3">
+              <div>
+                <div className="font-display text-lg">{b.booking_number} · <span className="text-primary">{b.booking_type}</span></div>
+                <div className="text-sm text-muted">{b.name} · {b.mobile}</div>
+                <div className="text-sm text-muted mt-1">📅 {b.date}{b.time ? ` at ${b.time}` : ""} · {b.guests} guests</div>
+                {b.notes && <div className="text-sm text-muted mt-1">📝 {b.notes}</div>}
+                <div className="text-xs text-muted mt-1">{new Date(b.created_at).toLocaleString()}</div>
+              </div>
+              <div className="text-right">
+                <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase ${BK_COLORS[b.status] || "bg-white/10"}`}>{b.status}</span>
+                <select data-testid={`booking-status-${b.booking_number}`} value={b.status} onChange={(e) => setStatus(b.id, e.target.value)} className="block mt-2 bg-elevated border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none">
+                  {BOOKING_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <button data-testid={`booking-delete-${b.booking_number}`} onClick={() => del(b.id)} className="mt-2 text-xs flex items-center gap-1 text-red-400 hover:text-red-300 ml-auto"><Trash2 size={13} /> Delete</button>
+              </div>
+            </div>
           </div>
         ))}
       </div>

@@ -171,7 +171,7 @@ class TestAuthEnforcement:
         ("put", "/api/menu/does-not-exist", {"json": {"name": "x", "price": 1, "category": "Veg"}}),
         ("delete", "/api/menu/does-not-exist", {}),
         ("get", "/api/orders?admin=true", {}),
-        ("put", "/api/orders/xyz/status", {"json": {"status": "delivered"}}),
+        ("put", "/api/orders/xyz/status", {"json": {"status": "completed"}}),
         ("put", "/api/settings", {"json": {"delivery_charge": 1, "packaging_charge": 1,
                                            "free_delivery_above": 1, "offer_banner": "a",
                                            "party_note": "b"}}),
@@ -255,15 +255,15 @@ class TestAdminFlows:
         assert any(x["id"] == order["id"] for x in allo.json())
 
         r = admin_client.put(f"{BASE_URL}/api/orders/{order['id']}/status",
-                             json={"status": "delivered"})
+                             json={"status": "completed"})
         assert r.status_code == 200
         found = [x for x in admin_client.get(
             f"{BASE_URL}/api/orders", params={"admin": "true"}).json()
             if x["id"] == order["id"]][0]
-        assert found["status"] == "delivered"
+        assert found["status"] == "completed"
 
         assert admin_client.put(f"{BASE_URL}/api/orders/nope/status",
-                                json={"status": "delivered"}).status_code == 404
+                                json={"status": "completed"}).status_code == 404
 
     def test_settings_update(self, admin_client, api_client):
         original = api_client.get(f"{BASE_URL}/api/settings").json()
@@ -288,6 +288,153 @@ class TestAdminFlows:
         assert not any(x["id"] == rid for x in api_client.get(f"{BASE_URL}/api/reviews").json())
 
 
+# ---------------- Offers (rotating banner) ----------------
+class TestOffers:
+    def test_public_offers_active_only(self, api_client):
+        r = api_client.get(f"{BASE_URL}/api/offers")
+        assert r.status_code == 200
+        data = r.json()
+        assert isinstance(data, list) and len(data) >= 3
+        for o in data:
+            assert o["active"] is True
+            assert isinstance(o["text"], str) and o["text"]
+            assert "id" in o and "_id" not in o
+
+    def test_offers_all_requires_admin(self, api_client):
+        r = api_client.get(f"{BASE_URL}/api/offers?all=true")
+        assert r.status_code in (401, 403), r.text
+
+    def test_offers_all_as_admin(self, admin_client, api_client):
+        r = admin_client.get(f"{BASE_URL}/api/offers?all=true")
+        assert r.status_code == 200
+        assert len(r.json()) >= len(api_client.get(f"{BASE_URL}/api/offers").json())
+
+    @pytest.mark.parametrize("method,path,kwargs", [
+        ("post", "/api/offers", {"json": {"text": "TEST_x"}}),
+        ("put", "/api/offers/none", {"json": {"text": "TEST_x"}}),
+        ("delete", "/api/offers/none", {}),
+    ])
+    def test_offer_writes_require_admin(self, api_client, method, path, kwargs):
+        r = getattr(api_client, method)(f"{BASE_URL}{path}", **kwargs)
+        assert r.status_code in (401, 403), f"{method} {path} -> {r.status_code}"
+
+    def test_offer_crud_and_visibility(self, admin_client, api_client):
+        # CREATE
+        r = admin_client.post(f"{BASE_URL}/api/offers", json={"text": "TEST_OFFER_A", "active": True})
+        assert r.status_code == 200, r.text
+        o = r.json()
+        oid = o["id"]
+        assert o["text"] == "TEST_OFFER_A" and o["active"] is True
+        # visible publicly
+        pub = api_client.get(f"{BASE_URL}/api/offers").json()
+        assert any(x["id"] == oid and x["text"] == "TEST_OFFER_A" for x in pub)
+
+        # UPDATE -> deactivate + edit text
+        r = admin_client.put(f"{BASE_URL}/api/offers/{oid}", json={"text": "TEST_OFFER_A2", "active": False})
+        assert r.status_code == 200, r.text
+        assert r.json()["text"] == "TEST_OFFER_A2" and r.json()["active"] is False
+        # not visible publicly, visible in all=true
+        assert not any(x["id"] == oid for x in api_client.get(f"{BASE_URL}/api/offers").json())
+        alls = admin_client.get(f"{BASE_URL}/api/offers?all=true").json()
+        assert any(x["id"] == oid and x["active"] is False for x in alls)
+
+        # UPDATE unknown id -> 404
+        assert admin_client.put(f"{BASE_URL}/api/offers/nope-{uuid.uuid4().hex[:6]}",
+                                json={"text": "x", "active": True}).status_code == 404
+
+        # DELETE
+        assert admin_client.delete(f"{BASE_URL}/api/offers/{oid}").status_code == 200
+        assert not any(x["id"] == oid for x in admin_client.get(f"{BASE_URL}/api/offers?all=true").json())
+
+    def test_offer_validation(self, admin_client):
+        r = admin_client.post(f"{BASE_URL}/api/offers", json={"active": True})
+        assert r.status_code == 422
+
+
+# ---------------- Bookings (table & party) ----------------
+BOOKING_TYPES = ["Table Reservation", "Birthday Party", "Anniversary Party", "Kitty Party", "Get Together"]
+
+
+class TestBookings:
+    created = []
+
+    def test_create_booking_public(self, api_client):
+        payload = {"name": "TEST_Booker", "mobile": TEST_MOBILE, "booking_type": "Birthday Party",
+                   "date": "2026-08-15", "time": "19:30", "guests": 6, "notes": "TEST cake"}
+        r = api_client.post(f"{BASE_URL}/api/bookings", json=payload)
+        assert r.status_code == 200, r.text
+        b = r.json()
+        TestBookings.created.append(b["id"])
+        assert b["status"] == "pending"
+        assert b["booking_number"].startswith("BK")
+        assert int(b["booking_number"][2:]) >= 101
+        assert b["name"] == payload["name"] and b["guests"] == 6
+        assert b["booking_type"] == "Birthday Party"
+        assert "_id" not in b
+
+    def test_booking_numbers_increment(self, api_client):
+        nums = []
+        for i in range(2):
+            r = api_client.post(f"{BASE_URL}/api/bookings", json={
+                "name": f"TEST_Seq{i}", "mobile": TEST_MOBILE, "booking_type": "Table Reservation",
+                "date": "2026-08-16", "guests": 2})
+            assert r.status_code == 200
+            TestBookings.created.append(r.json()["id"])
+            nums.append(int(r.json()["booking_number"][2:]))
+        assert nums[1] == nums[0] + 1
+
+    @pytest.mark.parametrize("btype", BOOKING_TYPES)
+    def test_all_booking_types_accepted(self, api_client, btype):
+        r = api_client.post(f"{BASE_URL}/api/bookings", json={
+            "name": "TEST_Type", "mobile": TEST_MOBILE, "booking_type": btype, "date": "2026-09-01"})
+        assert r.status_code == 200, r.text
+        TestBookings.created.append(r.json()["id"])
+        assert r.json()["booking_type"] == btype
+
+    def test_invalid_booking_type_rejected(self, api_client):
+        r = api_client.post(f"{BASE_URL}/api/bookings", json={
+            "name": "TEST_Bad", "mobile": TEST_MOBILE, "booking_type": "Wedding", "date": "2026-09-01"})
+        assert r.status_code == 422, r.text
+
+    def test_missing_required_fields(self, api_client):
+        r = api_client.post(f"{BASE_URL}/api/bookings", json={"mobile": TEST_MOBILE})
+        assert r.status_code == 422
+
+    def test_list_bookings_requires_admin(self, api_client):
+        assert api_client.get(f"{BASE_URL}/api/bookings").status_code in (401, 403)
+
+    def test_status_update_requires_admin(self, api_client):
+        r = api_client.put(f"{BASE_URL}/api/bookings/anything/status", json={"status": "confirmed"})
+        assert r.status_code in (401, 403)
+
+    def test_admin_list_and_status_flow(self, admin_client, api_client):
+        r = api_client.post(f"{BASE_URL}/api/bookings", json={
+            "name": "TEST_Flow", "mobile": TEST_MOBILE, "booking_type": "Kitty Party",
+            "date": "2026-10-05", "guests": 10})
+        assert r.status_code == 200
+        bid = r.json()["id"]
+        TestBookings.created.append(bid)
+
+        lst = admin_client.get(f"{BASE_URL}/api/bookings")
+        assert lst.status_code == 200
+        rows = lst.json()
+        row = next((x for x in rows if x["id"] == bid), None)
+        assert row is not None and row["status"] == "pending"
+        assert row["guests"] == 10 and "_id" not in row
+
+        for st in ["confirmed", "cancelled", "pending"]:
+            up = admin_client.put(f"{BASE_URL}/api/bookings/{bid}/status", json={"status": st})
+            assert up.status_code == 200, up.text
+            after = admin_client.get(f"{BASE_URL}/api/bookings").json()
+            assert next(x for x in after if x["id"] == bid)["status"] == st
+
+        bad = admin_client.put(f"{BASE_URL}/api/bookings/{bid}/status", json={"status": "done"})
+        assert bad.status_code == 422
+        nf = admin_client.put(f"{BASE_URL}/api/bookings/nope-{uuid.uuid4().hex[:6]}/status",
+                              json={"status": "confirmed"})
+        assert nf.status_code == 404
+
+
 # ---------------- Cleanup of test orders ----------------
 @pytest.fixture(scope="session", autouse=True)
 def cleanup():
@@ -296,4 +443,6 @@ def cleanup():
     mc[DB_NAME].orders.delete_many({"mobile": TEST_MOBILE})
     mc[DB_NAME].menu.delete_many({"name": {"$regex": "^TEST_"}})
     mc[DB_NAME].reviews.delete_many({"name": {"$regex": "^TEST "}})
+    mc[DB_NAME].offers.delete_many({"text": {"$regex": "^TEST_"}})
+    mc[DB_NAME].bookings.delete_many({"name": {"$regex": "^TEST_"}})
     mc.close()

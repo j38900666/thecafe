@@ -25,6 +25,10 @@ Premium, mobile-friendly restaurant & cafeteria website with full customer order
 - Seed: 22 menu items across 8 categories, 3 reviews, default settings.
 
 ## Backlog / Next
-- P1: Customer review submission form on site (currently seeded + admin-managed only).
 - P2: Object-storage for uploaded images (currently base64 in Mongo).
-- P2: Order notifications to restaurant (email/WhatsApp auto).
+- P2: Auto order/booking notifications to restaurant (email/WhatsApp).
+
+## Iteration 2 (2026-06)
+- **Live rotating Offers banner** on homepage (auto-rotates active offers every 4s, clickable dots); admin **Offers** tab to add/toggle/delete offers (live on site). Seeded 3 offers.
+- **Table & Party Booking**: homepage booking form + "Book Table" nav link + "Book Online" CTA in party section. Types: Table Reservation, Birthday Party, Anniversary Party, Kitty Party, Get Together (advance booking). Submit or send via WhatsApp. Admin **Bookings** tab lists requests, updates status (pending/confirmed/cancelled) and deletes.
+- Backend: /api/offers (public) + /api/offers/admin, full offers CRUD; /api/bookings (create with BK counter + server-side 10-digit mobile & no-past-date validation), GET/PUT status/DELETE (admin). Tested 100% backend + frontend (iteration_2).

@@ -1,26 +1,37 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Utensils, ShoppingBag, MessageCircle, Phone, Truck, Star, PartyPopper, MapPin, Tag } from "lucide-react";
+import { Utensils, ShoppingBag, MessageCircle, Phone, Truck, Star, PartyPopper, MapPin, Tag, CalendarCheck } from "lucide-react";
 import api from "../lib/api";
 import { BUSINESS, CURRENCY } from "../lib/constants";
 import MenuCard from "../components/MenuCard";
+import BookingSection from "../components/BookingSection";
 
 export default function Home() {
   const navigate = useNavigate();
   const [menu, setMenu] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [offers, setOffers] = useState([]);
+  const [offerIdx, setOfferIdx] = useState(0);
 
   useEffect(() => {
     api.get("/menu").then((r) => setMenu(r.data)).catch(() => {});
     api.get("/reviews").then((r) => setReviews(r.data)).catch(() => {});
     api.get("/settings").then((r) => setSettings(r.data)).catch(() => {});
+    api.get("/offers").then((r) => setOffers(r.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (offers.length <= 1) return;
+    const t = setInterval(() => setOfferIdx((i) => (i + 1) % offers.length), 4000);
+    return () => clearInterval(t);
+  }, [offers.length]);
 
   const bestSellers = menu.filter((m) => m.is_bestseller).slice(0, 3);
   const specials = menu.filter((m) => m.is_todays_special).slice(0, 3);
   const menuUrl = `${window.location.origin}/menu`;
+  const scrollToBooking = () => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <div>
@@ -76,12 +87,36 @@ export default function Home() {
         </div>
       </section>
 
-      {/* OFFER STRIP */}
-      {settings?.offer_banner && (
+      {/* ROTATING OFFERS BANNER */}
+      {offers.length > 0 && (
         <section className="max-w-7xl mx-auto px-5 mt-6">
-          <div data-testid="offer-banner" className="bg-surface border border-primary/30 rounded-xl p-4 flex items-center gap-3">
+          <div data-testid="offer-banner" className="relative overflow-hidden bg-surface border border-primary/30 rounded-xl p-4 flex items-center gap-3 min-h-[60px]">
             <Tag className="text-primary shrink-0" size={22} />
-            <p className="text-sm md:text-base font-semibold">{settings.offer_banner}</p>
+            <div className="relative flex-1 h-6 overflow-hidden">
+              {offers.map((o, i) => (
+                <p
+                  key={o.id}
+                  data-testid={`offer-slide-${i}`}
+                  className="absolute inset-0 text-sm md:text-base font-semibold transition-all duration-500"
+                  style={{ opacity: i === offerIdx ? 1 : 0, transform: i === offerIdx ? "translateY(0)" : "translateY(8px)" }}
+                >
+                  {o.text}
+                </p>
+              ))}
+            </div>
+            {offers.length > 1 && (
+              <div className="flex gap-1.5 shrink-0">
+                {offers.map((_, i) => (
+                  <button
+                    key={i}
+                    data-testid={`offer-dot-${i}`}
+                    onClick={() => setOfferIdx(i)}
+                    className={`w-2 h-2 rounded-full transition-colors ${i === offerIdx ? "bg-primary" : "bg-white/25"}`}
+                    aria-label={`Offer ${i + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -124,10 +159,16 @@ export default function Home() {
               <a data-testid="party-call-btn" href={`tel:${BUSINESS.phone}`} className="bg-primary hover:bg-primaryHover text-black font-bold px-7 py-3.5 rounded-full flex items-center gap-2 transition-colors">
                 <Phone size={18} /> Call to Book
               </a>
+              <button data-testid="party-book-now-btn" onClick={scrollToBooking} className="bg-white text-black font-bold px-7 py-3.5 rounded-full flex items-center gap-2 transition-colors hover:-translate-y-0.5 duration-200">
+                <CalendarCheck size={18} /> Book Online
+              </button>
             </div>
           </div>
         </div>
       </section>
+
+      {/* TABLE & PARTY BOOKING */}
+      <BookingSection />
 
       {/* REVIEWS */}
       {reviews.length > 0 && (
